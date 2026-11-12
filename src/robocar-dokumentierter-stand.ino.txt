@@ -1,0 +1,134 @@
+// Dokumentierter Softwarestand des Erstsemesterprojekts (2023/24).
+// Aus dem Quellcode-Anhang der damaligen Dokumentation uebernommen.
+// Der persoenliche BLE-Geraetename wurde durch ESP-RoboCar ersetzt.
+// ACHTUNG: Keine direkt lauffaehige Firmware. Im Original fehlen die
+// RemoteXY-Konfigurationsbytes.
+// Die fehlende Konfiguration wurde fuer die Portfoliofassung nicht erfunden.
+// Siehe docs/software.md fuer Einordnung und technische Grenzen.
+
+// Motorkontrolle
+const int MotorLinkerVor = 3;      // Pin für Vorwärtsbewegung des linken Motors
+const int MotorLinkerRueck = 2;    // Pin für Rückwärtsbewegung des linken Motors
+const int MotorRechterVor = 19;    // Pin für Vorwärtsbewegung des rechten Motors
+const int MotorRechterRueck = 18;  // Pin für Rückwärtsbewegung des rechten Motors
+
+int SensorLinksWert = 0;  // Variable für den Wert des linken Sensors
+int SensorRechtsWert = 0; // Variable für den Wert des rechten Sensors
+
+const int SensorLinks = A0;  // Pin für den linken Liniensensor
+const int SensorRechts = A1; // Pin für den rechten Liniensensor
+const int LinienErkennungSchwelle = 3000; // Schwellenwert für Linien-Erkennung
+
+int GeschwRechts = 255; // Geschwindigkeit des rechten Motors
+int GeschwLinks = 235;  // Geschwindigkeit des linken Motors
+
+// Funktion zum Anhalten beider Motoren
+void halteMotorenAn(){
+  analogWrite(MotorLinkerVor, 0);
+  analogWrite(MotorLinkerRueck, 0);
+  analogWrite(MotorRechterVor, 0);
+  analogWrite(MotorRechterRueck, 0);
+}
+
+// Funktion zum Rückwärtsfahren
+void fahreRueckwaerts() {
+  analogWrite(MotorLinkerVor, 0); 
+  analogWrite(MotorLinkerRueck, GeschwLinks); 
+  analogWrite(MotorRechterVor, 0); 
+  analogWrite(MotorRechterRueck, GeschwRechts); 
+}
+
+#define SCHALTER_MOTOR 11  // Pin für Motor-Ein/Aus-Schalter
+#define SCHALTER_2 9       // Pin für einen zusätzlichen Schalter
+
+// RemoteXY Konfiguration
+#define REMOTEXY_MODE__ESP32CORE_BLE  // Definition für RemoteXY-Modus (BLE für ESP32)
+#include <BLEDevice.h>               // Bibliothek für BLE-Geräte
+#include <RemoteXY.h>                // Bibliothek für RemoteXY
+
+#define REMOTEXY_BLUETOOTH_NAME "ESP-RoboCar"      // Bluetooth-Name für die Verbindung
+#define REMOTEXY_ACCESS_PASSWORD ""         // Passwort für den Zugriff (leer)
+
+// Konfiguration für RemoteXY
+#pragma pack(push, 1)
+uint8_t RemoteXY_CONF[] = {
+  // ... Konfigurationsbytes ...
+};
+
+// Struktur für RemoteXY-Variablen
+struct {
+  uint8_t schalter_1;
+  uint8_t motorEinAus;
+  uint8_t schalter_2;
+  int8_t reglerLinks;
+  int8_t reglerRechts;
+  uint8_t verbindungStatus;
+} RemoteXY;
+
+#pragma pack(pop)
+
+// Setup-Funktion für Initialisierung
+void setup() {
+  RemoteXY_Init();  // Initialisierung von RemoteXY
+  Serial.begin(9600); // Start der seriellen Kommunikation
+
+  // Pin-Modi setzen
+  pinMode(SensorLinks, INPUT);
+  pinMode(SensorRechts, INPUT);
+
+  pinMode(MotorLinkerVor, OUTPUT);
+  pinMode(MotorLinkerRueck, OUTPUT);
+  pinMode(MotorRechterVor, OUTPUT);
+  pinMode(MotorRechterRueck, OUTPUT);
+
+  pinMode(SCHALTER_MOTOR, OUTPUT);
+  pinMode(SCHALTER_2, OUTPUT);
+}
+
+// Hauptfunktion, die in einer Schleife läuft
+void loop() {
+  RemoteXY_Handler();  // Verarbeitet RemoteXY-Kommandos
+
+  // Umrechnung der Reglerwerte in Geschwindigkeitswerte
+  int geschwLinks = map(RemoteXY.reglerLinks, -100, 100, -255, 255);
+  int geschwRechts = map(RemoteXY.reglerRechts, -100, 100, -255, 255);
+
+  // Auslesen der Sensorwerte
+  int wertSensorLinks = analogRead(SensorLinks);
+  int wertSensorRechts = analogRead(SensorRechts);
+
+  // Prüfung der Sensorwerte und entsprechende Reaktion
+  if ((wertSensorLinks >= LinienErkennungSchwelle) || (wertSensorRechts >= LinienErkennungSchwelle)) {
+    fahreRueckwaerts();
+    delay(700);
+    halteMotorenAn();
+    delay(2000); // Zusätzliche Wartezeit
+  } else {
+    // Steuerung der Motoren basierend auf den Reglerwerten
+    if (geschwLinks >= 0) {
+      analogWrite(MotorLinkerRueck, geschwLinks);
+      analogWrite(MotorLinkerVor, 0);
+    } else {
+      analogWrite(MotorLinkerRueck, 0);
+      analogWrite(MotorLinkerVor, abs(geschwLinks));
+    }
+
+    if (geschwRechts >= 0) {
+      analogWrite(MotorRechterVor, geschwRechts);
+      analogWrite(MotorRechterRueck, 0);
+    } else {
+      analogWrite(MotorRechterVor, 0);
+      analogWrite(MotorRechterRueck, abs(geschwRechts));
+    }
+  }
+
+  // Steuerung der Schalter basierend auf den RemoteXY-Schalterzuständen
+  digitalWrite(SCHALTER_MOTOR, (RemoteXY.motorEinAus == 0) ? LOW : HIGH);
+  digitalWrite(SCHALTER_2, (RemoteXY.schalter_2 == 0) ? LOW : HIGH);
+
+  // Ausgabe der Sensorwerte auf der seriellen Schnittstelle
+  Serial.print("Sensorwert Links: ");
+  Serial.println(wertSensorLinks);
+  Serial.print("Sensorwert Rechts: ");
+  Serial.println(wertSensorRechts);
+}
