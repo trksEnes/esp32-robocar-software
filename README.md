@@ -4,7 +4,9 @@
 
 Ein per Smartphone gesteuertes Roboterauto für Autofußball: Zwei Motoren bewegen das Fahrzeug, zwei Reflexionssensoren erkennen die schwarze Spielfeldgrenze. Dazu entstanden eigene 3D-gedruckte Bauteile für den Fahrzeugaufbau und den Kontakt mit dem Ball.
 
-![Aufbau des RoboCars mit Elektronik, Verkabelung und Antrieb](assets/robocar-aufbau.jpg)
+<p align="center">
+  <img src="assets/robocar-aufbau.jpg" alt="Aufbau des RoboCars mit Elektronik, Verkabelung und Antrieb" width="360">
+</p>
 
 ## Mein Beitrag
 
