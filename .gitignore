@@ -1,0 +1,11 @@
+.DS_Store
+._*
+__MACOSX/
+*.pages
+*.pdf
+*.zip
+*.tgz
+*.log
+.vscode/
+.idea/
+build/
